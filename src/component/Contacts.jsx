@@ -618,6 +618,7 @@ const AddContactModal = ({ onClose, userId, onContactAdded }) => {
 // ContactDetails Component - Shows details of a selected contact
 const ContactDetails = ({ contactId, userId }) => {
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
   const [contact, setContact] = useState(null);
   const [showActionMenu, setShowActionMenu] = useState(false);
@@ -677,6 +678,8 @@ const ContactDetails = ({ contactId, userId }) => {
     } catch (error) {
       console.error("Error updating favorite status:", error);
     }
+    console.log("Toggle favorite for", contact.name);
+    setShowActionMenu(false);
   };
 
   const toggleBlocked = async () => {
