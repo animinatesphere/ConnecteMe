@@ -521,7 +521,7 @@ const Chat = () => {
           <button
             type="submit"
             disabled={!newMessage.trim()}
-            className={`p-2 rounded-full transition-colors duration-200 ${
+            className={`p-2 rounded-full transition-colors duration-200 cursor-pointer ${
               newMessage.trim()
                 ? "bg-blue-600 hover:bg-blue-500 text-white"
                 : "bg-gray-700 text-gray-500"
