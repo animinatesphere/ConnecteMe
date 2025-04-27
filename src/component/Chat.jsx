@@ -314,11 +314,11 @@ const Chat = () => {
   return (
     <div className=" flex flex-col h-screen bg-gray-900 flex-1">
       {/* Chat Header */}
-      <div className="bg-gray-800 p-4 flex items-center border-b border-gray-700 mt-[5rem]">
-        <button
-          onClick={() => navigate(`/contacts/${contactId}`)}
-          className="mr-4 hover:bg-gray-700 p-2 rounded-full transition-colors duration-200"
-        >
+      <div
+        className="bg-gray-800 p-4 flex items-center border-b border-gray-700 mt-[5rem] cursor-pointer"
+        onClick={() => navigate(`/contacts/${contactId}`)}
+      >
+        <button className="mr-4 hover:bg-gray-700 p-2 rounded-full transition-colors duration-200">
           <svg
             className="w-5 h-5 text-gray-400"
             fill="none"
