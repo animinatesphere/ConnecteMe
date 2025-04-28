@@ -57,7 +57,7 @@ export default function Login() {
         </div>
 
         {/* Login Box */}
-        <div className="w-[300px] sm:w-[350px] lg:w-[500px] h-[350px] bg-gray-800 rounded-lg shadow-lg p-8">
+        <div className="w-[300px] sm:w-[350px] lg:w-[500px] h-[450px] bg-gray-800 rounded-lg shadow-lg p-8">
           <h2 className="text-white text-2xl font-bold mb-6">Login</h2>
 
           {error && (
