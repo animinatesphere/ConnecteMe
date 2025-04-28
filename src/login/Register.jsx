@@ -336,7 +336,7 @@ export default function Register() {
             </div>
           </div>
         </div>
-        <div className="mt-6 text-center text-sm">
+        <div className="mt-6 text-center text-sm mb-5">
           <span className="text-gray-400 text-[16px]">
             Already have an account?
           </span>{" "}
