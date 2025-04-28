@@ -1,22 +1,47 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
-
+import { supabase } from "../../supabase";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notification, setNotification] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { signIn } = useAuth();
 
+  async function checkUserExists(email) {
+    try {
+      // This is a simplified check - in a real implementation, you might want to use
+      // a specific API endpoint that checks if an email exists without attempting to log in
+      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
+      return !!data;
+    } catch (error) {
+      console.error("Error checking user:", error);
+      return false;
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
+    setError("");
+    setNotification("");
+    setLoading(true);
 
     try {
-      setError("");
-      setLoading(true);
+      // Check if user exists before attempting to login
+      const userExists = await checkUserExists(email);
 
+      if (!userExists) {
+        setNotification(
+          "This email doesn't seem to be registered. Would you like to create an account? or confirm your email?"
+        );
+        setLoading(false);
+        return;
+      }
+
+      // Proceed with login if user exists
       const { error } = await signIn({ email, password });
 
       if (error) throw error;
@@ -57,9 +82,25 @@ export default function Login() {
         </div>
 
         {/* Login Box */}
-        <div className="w-[300px] sm:w-[350px] lg:w-[500px] h-[450px] bg-gray-800 rounded-lg shadow-lg p-8">
+        <div className="w-[300px] sm:w-[350px] lg:w-[500px] h-auto bg-gray-800 rounded-lg shadow-lg p-8">
           <h2 className="text-white text-2xl font-bold mb-6">Login</h2>
 
+          {/* Notification for unregistered users */}
+          {notification && (
+            <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded relative mb-4">
+              <span className="block sm:inline">{notification}</span>
+              <div className="mt-2">
+                <Link
+                  to="/register"
+                  className="font-medium text-blue-700 hover:text-blue-900 underline"
+                >
+                  Create an account
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {/* Error messages */}
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
               <span className="block sm:inline">{error}</span>

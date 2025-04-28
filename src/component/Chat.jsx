@@ -15,7 +15,9 @@ const Chat = () => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const notificationSound = useRef(new Audio("/notification-sound.mp3"));
+  const notificationSound = useRef(
+    new Audio("./sound/notification-sound.mp3.wav")
+  );
   // Add this useEffect for notification setup
   useEffect(() => {
     // Request notification permission
