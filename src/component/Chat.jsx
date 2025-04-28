@@ -14,6 +14,22 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const notificationSound = useRef(new Audio("/notification-sound.mp3"));
+  // Add this useEffect for notification setup
+  useEffect(() => {
+    // Request notification permission
+    const requestNotificationPermission = async () => {
+      if (Notification.permission !== "granted") {
+        const permission = await Notification.requestPermission();
+        setNotificationsEnabled(permission === "granted");
+      } else {
+        setNotificationsEnabled(true);
+      }
+    };
+
+    requestNotificationPermission();
+  }, []);
 
   // Fetch contact details
   useEffect(() => {
@@ -91,34 +107,42 @@ const Chat = () => {
 
     fetchMessages();
 
-    // Setup real-time listener for new messages
+    // Modify your subscription handler to include notifications
     const messageSubscription = supabase
-      .channel("messages-channel")
+      .channel(`messages-${contactId}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "messages",
-          // Remove the complex filter completely to see if that helps
+          filter: `sender_id=eq.${contact.contact_user_id},receiver_id=eq.${user.id}`,
         },
         (payload) => {
-          // Only add messages relevant to this conversation
-          if (
-            (payload.new.sender_id === user.id &&
-              payload.new.receiver_id === contact.contact_user_id) ||
-            (payload.new.sender_id === contact.contact_user_id &&
-              payload.new.receiver_id === user.id)
-          ) {
-            setMessages((prev) => [...prev, payload.new]);
+          console.log("Received new message:", payload.new);
+          // Add message to state
+          setMessages((prev) => [...prev, payload.new]);
 
-            // Only mark as read if we're receiving the message
-            if (payload.new.receiver_id === user.id) {
-              supabase
-                .from("messages")
-                .update({ is_read: true })
-                .eq("id", payload.new.id);
-            }
+          // Send notification if not active in this chat
+          if (document.hidden && notificationsEnabled) {
+            // Play sound
+            notificationSound.current
+              .play()
+              .catch((e) => console.log("Error playing sound:", e));
+
+            // Show notification
+            new Notification(`New message from ${contact.name}`, {
+              body: payload.new.content,
+              icon: contact.profile_image_url || "/default-avatar.png", // Add a default avatar image
+            });
+          }
+
+          // Mark as read
+          if (payload.new.receiver_id === user.id) {
+            supabase
+              .from("messages")
+              .update({ is_read: true })
+              .eq("id", payload.new.id);
           }
         }
       )
@@ -191,22 +215,29 @@ const Chat = () => {
     }
   };
 
-  // Update chat session
+  // Update the updateChatSession function
   const updateChatSession = async (lastMessage) => {
     try {
       // Check if session exists
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("chat_sessions")
         .select("*")
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
         .or(
-          `user1_id.eq.${contact.contact_user_id},user2_id.eq.${contact.contact_user_id}`
+          `(user1_id.eq.${user.id}.and.user2_id.eq.${contact.contact_user_id})`
+        )
+        .or(
+          `(user1_id.eq.${contact.contact_user_id}.and.user2_id.eq.${user.id})`
         )
         .single();
 
+      if (error && error.code !== "PGRST116") {
+        console.error("Error checking chat session:", error);
+        return;
+      }
+
       const sessionData = {
         last_message: lastMessage,
-        last_message_time: new Date(),
+        last_message_time: new Date().toISOString(),
         is_active: true,
       };
 
