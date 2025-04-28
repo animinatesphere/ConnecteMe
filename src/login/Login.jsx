@@ -13,10 +13,22 @@ export default function Login() {
 
   async function checkUserExists(email) {
     try {
-      // This is a simplified check - in a real implementation, you might want to use
-      // a specific API endpoint that checks if an email exists without attempting to log in
-      const { data, error } = await supabase.auth.admin.getUserByEmail(email);
-      return !!data;
+      // Use the proper client-side API to check if user exists
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email: email,
+        options: {
+          shouldCreateUser: false, // This prevents creating a new user
+        },
+      });
+
+      // If there's an error about user not found, the user doesn't exist
+      if (error && error.message.includes("User not found")) {
+        return false;
+      }
+
+      // If we get here, either the user exists or there was another error
+      // For security reasons, we'll assume user exists if there's any other error
+      return true;
     } catch (error) {
       console.error("Error checking user:", error);
       return false;
@@ -30,21 +42,24 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Check if user exists before attempting to login
-      const userExists = await checkUserExists(email);
-
-      if (!userExists) {
-        setNotification(
-          "This email doesn't seem to be registered. Would you like to create an account? or confirm your email?"
-        );
-        setLoading(false);
-        return;
-      }
-
-      // Proceed with login if user exists
+      // Attempt to sign in directly
       const { error } = await signIn({ email, password });
 
-      if (error) throw error;
+      if (error) {
+        // If error indicates user doesn't exist, show the notification
+        if (
+          error.message.includes("Invalid login credentials") ||
+          error.message.includes("User not found")
+        ) {
+          setNotification(
+            "This email doesn't seem to be registered. Would you like to create an account? or confirm your email?"
+          );
+        } else {
+          // For other errors, display the error message
+          setError(error.message);
+        }
+        return;
+      }
 
       navigate("/dashboard");
     } catch (error) {

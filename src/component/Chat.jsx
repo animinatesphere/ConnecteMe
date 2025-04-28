@@ -15,10 +15,9 @@ const Chat = () => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const notificationSound = useRef(
-    new Audio("./sound/notification-sound.mp3.wav")
-  );
+  const [notificationSound, setNotificationSound] = useState(null);
   // Add this useEffect for notification setup
+  // In your useEffect for notification setup, add this
   useEffect(() => {
     // Request notification permission
     const requestNotificationPermission = async () => {
@@ -27,6 +26,24 @@ const Chat = () => {
         setNotificationsEnabled(permission === "granted");
       } else {
         setNotificationsEnabled(true);
+      }
+
+      // Use default system notification sound
+      // This will use the device's default notification sound
+      if ("Notification" in window && "sound" in Notification.prototype) {
+        // Modern browsers with notification sound support
+        // No need to set a custom sound
+      } else {
+        // Fallback for browsers that need a sound object
+        try {
+          // Create a short beep sound as fallback
+          const sound = new Audio(
+            "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLHPR7tF/NgIbWbvq54VGCBNP4vLceUQNDUDt+OV8TBIMOvb8432AXBQFHwABA4BvXxj6CQgOf5hpGOcVFhJ7p2UZ1CAiKnypdxrMKik8eHN1H6AvN05tbhsnk1ZSfZRqG3ZVVFZ1nWsUWHhcRJaHYhoSomlezq97FC3EhGd+rYIXKNOVgXaofBItxYxmhJt5GjjDiWWWnXsVR72JabWWdxJRwpBwf5iFDm8WAwIBr5N2HHoVCgSXlHMfjyIcHIeachWJLDZEeJ9gE3Q7WG1tsUkPxTUzWhUBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAA=="
+          );
+          setNotificationSound(sound);
+        } catch (err) {
+          console.error("Could not create audio element:", err);
+        }
       }
     };
 
@@ -108,61 +125,80 @@ const Chat = () => {
     };
 
     fetchMessages();
-
-    // Modify your subscription handler to include notifications
+    const typingSubscription = supabase
+      .channel(`typing-${user.id}-${contact.contact_user_id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Listen for all events (INSERT, UPDATE, DELETE)
+          schema: "public",
+          table: "typing_status",
+          filter: `user_id=eq.${contact.contact_user_id}`,
+        },
+        (payload) => {
+          console.log("Typing status update:", payload);
+          if (payload.new && payload.new.chat_with_user_id === user.id) {
+            setIsTyping(payload.new.is_typing);
+          }
+        }
+      )
+      .subscribe();
+    // Modify your subscription handler in the useEffect
     const messageSubscription = supabase
-      .channel(`messages-${contactId}`)
+      .channel(`messages-${user.id}-${contact.contact_user_id}`) // More specific channel name
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "messages",
-          filter: `sender_id=eq.${contact.contact_user_id},receiver_id=eq.${user.id}`,
+          filter: `receiver_id=eq.${user.id}`, // Only filter by receiver
         },
         (payload) => {
           console.log("Received new message:", payload.new);
-          // Add message to state
-          setMessages((prev) => [...prev, payload.new]);
 
-          // Send notification if not active in this chat
-          if (document.hidden && notificationsEnabled) {
-            // Play sound
-            notificationSound.current
-              .play()
-              .catch((e) => console.log("Error playing sound:", e));
-
-            // Show notification
-            new Notification(`New message from ${contact.name}`, {
-              body: payload.new.content,
-              icon: contact.profile_image_url || "/default-avatar.png", // Add a default avatar image
+          // Check if this is a message from our current contact
+          if (payload.new.sender_id === contact.contact_user_id) {
+            // Add message to state with a callback to ensure we get the latest state
+            setMessages((prevMessages) => {
+              // Check if this message is already in our list to avoid duplicates
+              const messageExists = prevMessages.some(
+                (msg) => msg.id === payload.new.id
+              );
+              if (messageExists) return prevMessages;
+              return [...prevMessages, payload.new];
             });
-          }
 
-          // Mark as read
-          if (payload.new.receiver_id === user.id) {
+            // Play notification sound if available and page is not visible
+            if (document.hidden && notificationsEnabled) {
+              if (notificationSound) {
+                notificationSound
+                  .play()
+                  .catch((e) => console.log("Error playing sound:", e));
+              }
+
+              // Show notification
+              try {
+                new Notification(`New message from ${contact.name}`, {
+                  body: payload.new.content,
+                  icon: contact.profile_image_url || "/default-avatar.png",
+                  // Modern browsers will use device sound
+                  silent: false, // Allow system sound
+                });
+              } catch (err) {
+                console.error("Notification error:", err);
+              }
+            }
+
+            // Mark as read
             supabase
               .from("messages")
               .update({ is_read: true })
-              .eq("id", payload.new.id);
-          }
-        }
-      )
-      .subscribe();
-    // Setup typing status listener
-    const typingSubscription = supabase
-      .channel("typing-channel")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "typing_status",
-          filter: `user_id=eq.${contact.contact_user_id}`,
-        },
-        (payload) => {
-          if (payload.new.chat_with_user_id === user.id) {
-            setIsTyping(payload.new.is_typing);
+              .eq("id", payload.new.id)
+              .then(({ error }) => {
+                if (error)
+                  console.error("Error marking message as read:", error);
+              });
           }
         }
       )
