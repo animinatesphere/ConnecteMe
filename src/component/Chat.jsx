@@ -16,8 +16,8 @@ const Chat = () => {
   const typingTimeoutRef = useRef(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationSound, setNotificationSound] = useState(null);
+
   // Add this useEffect for notification setup
-  // In your useEffect for notification setup, add this
   useEffect(() => {
     // Request notification permission
     const requestNotificationPermission = async () => {
@@ -29,7 +29,6 @@ const Chat = () => {
       }
 
       // Use default system notification sound
-      // This will use the device's default notification sound
       if ("Notification" in window && "sound" in Notification.prototype) {
         // Modern browsers with notification sound support
         // No need to set a custom sound
@@ -38,7 +37,7 @@ const Chat = () => {
         try {
           // Create a short beep sound as fallback
           const sound = new Audio(
-            "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLHPR7tF/NgIbWbvq54VGCBNP4vLceUQNDUDt+OV8TBIMOvb8432AXBQFHwABA4BvXxj6CQgOf5hpGOcVFhJ7p2UZ1CAiKnypdxrMKik8eHN1H6AvN05tbhsnk1ZSfZRqG3ZVVFZ1nWsUWHhcRJaHYhoSomlezq97FC3EhGd+rYIXKNOVgXaofBItxYxmhJt5GjjDiWWWnXsVR72JabWWdxJRwpBwf5iFDm8WAwIBr5N2HHoVCgSXlHMfjyIcHIeachWJLDZEeJ9gE3Q7WG1tsUkPxTUzWhUBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAA=="
+            "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLHPR7tF/NgIbWbvq54VGCBNP4vLceUQNDUDt+OV8TBIMOvb8432AXBQFHwABA4BvXxj6CQgOf5hpGOcVFhJ7p2UZ1CAiKnypdxrMKik8eHN1H6AvN05tbhsnk1ZSfZRqG3ZVVFZ1nWsUWHhcRJaHYhoSomlezq97FC3EhGd+rYIXKNOVgXaofBItxYxmhJt5GjjDiWWWnXsVR72JabWWdxJRwpBwf5iFDm8WAwIBr5N2HHoVCgSXlHMfjyIcHIeachWJLDZEeJ9gE3Q7WG1tsUkPxTUzWhUBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
           );
           setNotificationSound(sound);
         } catch (err) {
@@ -79,7 +78,7 @@ const Chat = () => {
       }
     };
     fetchContact();
-  }, [contactId, user]);
+  }, [contactId, user, navigate]);
 
   // Fetch messages
   useEffect(() => {
@@ -90,19 +89,29 @@ const Chat = () => {
         setLoading(true);
 
         // Fetch messages between current user and contact
+        // Using filter patterns that work with Supabase's PostgREST API
         const { data, error } = await supabase
           .from("messages")
           .select("*")
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .or(`sender_id.eq.${user.id},sender_id.eq.${contact.contact_user_id}`)
           .or(
-            `sender_id.eq.${contact.contact_user_id},receiver_id.eq.${contact.contact_user_id}`
+            `receiver_id.eq.${user.id},receiver_id.eq.${contact.contact_user_id}`
           )
           .order("created_at", { ascending: true });
 
         if (error) throw error;
 
+        // Filter to only include messages between these two users
+        const filteredMessages = data.filter(
+          (msg) =>
+            (msg.sender_id === user.id &&
+              msg.receiver_id === contact.contact_user_id) ||
+            (msg.sender_id === contact.contact_user_id &&
+              msg.receiver_id === user.id)
+        );
+
         // Mark unread messages as read
-        const unreadMessages = data.filter(
+        const unreadMessages = filteredMessages.filter(
           (msg) => msg.receiver_id === user.id && !msg.is_read
         );
 
@@ -116,7 +125,7 @@ const Chat = () => {
             );
         }
 
-        setMessages(data || []);
+        setMessages(filteredMessages || []);
       } catch (error) {
         console.error("Error fetching messages:", error);
       } finally {
@@ -143,16 +152,17 @@ const Chat = () => {
         }
       )
       .subscribe();
-    // Modify your subscription handler in the useEffect
+
+    // Message subscription for realtime updates
     const messageSubscription = supabase
-      .channel(`messages-${user.id}-${contact.contact_user_id}`) // More specific channel name
+      .channel(`messages-${user.id}-${contact.contact_user_id}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
           table: "messages",
-          filter: `receiver_id=eq.${user.id}`, // Only filter by receiver
+          filter: `receiver_id=eq.${user.id}`,
         },
         (payload) => {
           console.log("Received new message:", payload.new);
@@ -208,7 +218,7 @@ const Chat = () => {
       supabase.removeChannel(messageSubscription);
       supabase.removeChannel(typingSubscription);
     };
-  }, [user, contact]);
+  }, [user, contact, notificationSound, notificationsEnabled]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -235,7 +245,7 @@ const Chat = () => {
 
       if (error) throw error;
 
-      console.log("New message data:", data[0]); // See what's coming back
+      console.log("New message data:", data[0]);
 
       // Add the new message to the state
       setMessages((prev) => [...prev, data[0]]);
@@ -253,25 +263,33 @@ const Chat = () => {
     }
   };
 
-  // Update the updateChatSession function
+  // FIXED: Update the updateChatSession function
   const updateChatSession = async (lastMessage) => {
     try {
-      // Check if session exists
+      // Check if session exists - Using filter parameters properly
       const { data, error } = await supabase
         .from("chat_sessions")
         .select("*")
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
         .or(
-          `(user1_id.eq.${user.id}.and.user2_id.eq.${contact.contact_user_id})`
-        )
-        .or(
-          `(user1_id.eq.${contact.contact_user_id}.and.user2_id.eq.${user.id})`
-        )
-        .single();
+          `user1_id.eq.${contact.contact_user_id},user2_id.eq.${contact.contact_user_id}`
+        );
 
-      if (error && error.code !== "PGRST116") {
+      if (error) {
         console.error("Error checking chat session:", error);
         return;
       }
+
+      // Filter out sessions that don't involve both users
+      const relevantSession = data
+        ? data.find(
+            (session) =>
+              (session.user1_id === user.id &&
+                session.user2_id === contact.contact_user_id) ||
+              (session.user1_id === contact.contact_user_id &&
+                session.user2_id === user.id)
+          )
+        : null;
 
       const sessionData = {
         last_message: lastMessage,
@@ -279,19 +297,35 @@ const Chat = () => {
         is_active: true,
       };
 
-      if (data) {
+      if (relevantSession) {
         // Update existing session
-        await supabase
+        const { error: updateError } = await supabase
           .from("chat_sessions")
           .update(sessionData)
-          .eq("id", data.id);
+          .eq("id", relevantSession.id);
+
+        if (updateError) {
+          console.error("Error updating chat session:", updateError);
+        }
       } else {
-        // Create new session
-        await supabase.from("chat_sessions").insert({
-          user1_id: user.id,
-          user2_id: contact.contact_user_id,
-          ...sessionData,
-        });
+        // Create new session with a generated UUID
+        const { error: insertError } = await supabase
+          .from("chat_sessions")
+          .insert({
+            id: crypto.randomUUID(), // Generate a UUID for the id field
+            user1_id: user.id,
+            user2_id: contact.contact_user_id,
+            ...sessionData,
+          });
+
+        if (insertError) {
+          console.error("Error creating chat session:", insertError);
+          console.log("Error details:", {
+            code: insertError.code,
+            details: insertError.details,
+            message: insertError.message,
+          });
+        }
       }
     } catch (error) {
       console.error("Error updating chat session:", error);
@@ -321,32 +355,58 @@ const Chat = () => {
     if (!contact || !user) return;
 
     try {
-      // First check if a record exists
-      const { data, error: fetchError } = await supabase
+      // First check if records exist - using regular select instead of maybeSingle to handle multiple rows
+      const { data: existingRecords, error: fetchError } = await supabase
         .from("typing_status")
         .select("*")
         .eq("user_id", user.id)
         .eq("chat_with_user_id", contact.contact_user_id);
 
-      if (fetchError) {
+      if (fetchError && fetchError.code !== "PGRST116") {
         console.error("Error fetching typing status:", fetchError);
         return;
       }
 
-      if (data && data.length > 0) {
+      // If we have existing records but multiple rows, clean them up
+      if (existingRecords && existingRecords.length > 1) {
+        // Delete all but the first record to clean up duplicates
+        const keepId = existingRecords[0].id;
+        const idsToDelete = existingRecords
+          .filter((record, index) => index > 0)
+          .map((record) => record.id);
+
+        if (idsToDelete.length > 0) {
+          await supabase.from("typing_status").delete().in("id", idsToDelete);
+        }
+
+        // Update the remaining record
+        const { error: updateError } = await supabase
+          .from("typing_status")
+          .update({
+            is_typing: isTyping,
+            last_updated: new Date().toISOString(),
+          })
+          .eq("id", keepId);
+
+        if (updateError)
+          console.error("Error updating typing status:", updateError);
+      }
+      // Single record exists
+      else if (existingRecords && existingRecords.length === 1) {
         // Update existing record
         const { error: updateError } = await supabase
           .from("typing_status")
           .update({
             is_typing: isTyping,
-            last_updated: new Date(),
+            last_updated: new Date().toISOString(),
           })
-          .eq("user_id", user.id)
-          .eq("chat_with_user_id", contact.contact_user_id);
+          .eq("id", existingRecords[0].id);
 
         if (updateError)
           console.error("Error updating typing status:", updateError);
-      } else {
+      }
+      // No records exist
+      else {
         // Create new record with a generated UUID
         const { error: insertError } = await supabase
           .from("typing_status")
@@ -355,7 +415,7 @@ const Chat = () => {
             user_id: user.id,
             chat_with_user_id: contact.contact_user_id,
             is_typing: isTyping,
-            last_updated: new Date(),
+            last_updated: new Date().toISOString(),
           });
 
         if (insertError) {
@@ -384,7 +444,7 @@ const Chat = () => {
     <div className=" flex flex-col h-screen bg-gray-900 flex-1">
       {/* Chat Header */}
       <div
-        className="bg-gray-800 p-4 flex items-center border-b border-gray-700 mt-[5rem] cursor-pointer"
+        className="bg-gray-800 p-4 flex items-center border-b border-gray-700 mt-[4rem] cursor-pointer"
         onClick={() => navigate(`/contacts/${contactId}`)}
       >
         <button className="mr-4 hover:bg-gray-700 p-2 rounded-full transition-colors duration-200">
@@ -492,7 +552,6 @@ const Chat = () => {
         ) : (
           messages.map((message) => {
             const isMyMessage = message.sender_id === user.id;
-            console.log("Message content:", message.content); // See what's actually in each message
             return (
               <div
                 key={message.id}
@@ -520,28 +579,24 @@ const Chat = () => {
                     {isMyMessage && (
                       <span className="ml-2">
                         {message.is_read ? (
+                          // Double check mark for read messages
                           <svg
-                            className="w-3 h-3 inline"
+                            className="w-6 h-6 inline text-blue-300"
                             fill="currentColor"
                             viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg"
                           >
-                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                            <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm-7.75 7.75L6.8 11.3l-1.4 1.4 4.85 4.85 10.35-10.35-1.4-1.4-8.95 8.95z" />
                           </svg>
                         ) : (
+                          // Single check mark for sent but unread messages
                           <svg
-                            className="w-3 h-3 inline"
-                            fill="none"
-                            stroke="currentColor"
+                            className="w-6 h-6 inline text-blue-300"
+                            fill="currentColor"
                             viewBox="0 0 24 24"
                             xmlns="http://www.w3.org/2000/svg"
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M5 13l4 4L19 7"
-                            />
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
                           </svg>
                         )}
                       </span>

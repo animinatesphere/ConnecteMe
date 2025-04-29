@@ -176,12 +176,13 @@ const Messages = () => {
       setRecentChats([]);
     }
   };
-  const fetchContacts = async (userId) => {
+  const fetchContacts = async () => {
     try {
       setLoading(true);
-      console.log("Fetching contacts for user:", userId); // Debug log
+      // Use the user ID from the auth context instead of a parameter
+      console.log("Fetching contacts for user:", user.id); // Debug log
 
-      let query = supabase.from("contacts").select("*").eq("user_id", userId);
+      let query = supabase.from("contacts").select("*").eq("user_id", user.id);
 
       // Apply filters
       if (activeFilter === "favorites") {
@@ -206,7 +207,6 @@ const Messages = () => {
       setLoading(false);
     }
   };
-
   const handleChatSelect = (contactId) => {
     navigate(`/chat/${contactId}`);
   };
