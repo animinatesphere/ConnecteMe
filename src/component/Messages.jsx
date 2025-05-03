@@ -52,11 +52,31 @@ const Messages = () => {
   const [activeFilter, setActiveFilter] = useState("all"); // Options: "all", "favorites", "blocked"
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      console.log("No user found, cannot fetch messages");
+      return;
+    }
+
+    console.log("Messages component mounted with user:", user.id);
 
     const fetchAllData = async () => {
       try {
         setLoading(true);
+        console.log("Starting to fetch all data...");
+
+        // Direct query to check if there are any messages at all
+        const { data: messageCheck, error: messageCheckError } = await supabase
+          .from("messages")
+          .select("id")
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .limit(1);
+
+        if (messageCheckError) {
+          console.error("Error checking for messages:", messageCheckError);
+        } else {
+          console.log("Message check result:", messageCheck);
+        }
+
         await fetchContacts();
         await fetchUnreadCounts();
         await fetchRecentChats();
@@ -81,6 +101,7 @@ const Messages = () => {
           filter: `receiver_id=eq.${user.id}`,
         },
         (payload) => {
+          console.log("New message received:", payload);
           // Update counts and refresh chats
           fetchUnreadCounts();
           fetchRecentChats();
@@ -88,13 +109,39 @@ const Messages = () => {
       )
       .subscribe();
 
+    // Also listen for message reads
+    const messageReadSubscription = supabase
+      .channel("message-read-notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `sender_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log("Message read status changed:", payload);
+          fetchRecentChats();
+        }
+      )
+      .subscribe();
+
+    console.log("Supabase subscriptions set up");
+
     return () => {
+      console.log("Cleaning up subscriptions");
       supabase.removeChannel(messagesSubscription);
+      supabase.removeChannel(messageReadSubscription);
     };
   }, [user]);
 
   const fetchUnreadCounts = async () => {
+    if (!user) return;
+
     try {
+      console.log("Fetching unread counts for user:", user.id);
+
       // First get all unread messages
       const { data, error } = await supabase
         .from("messages")
@@ -103,6 +150,8 @@ const Messages = () => {
         .eq("is_read", false);
 
       if (error) throw error;
+
+      console.log("Unread messages data:", data);
 
       // Count messages by sender manually
       const byContact = {};
@@ -114,30 +163,140 @@ const Messages = () => {
       });
 
       setUnreadCounts({ total, byContact });
+      console.log("Updated unread counts:", { total, byContact });
     } catch (error) {
       console.error("Error fetching unread counts:", error);
     }
   };
 
   const fetchRecentChats = async () => {
-    try {
-      // First get all contacts
-      const { data: contactsData, error: contactsError } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("user_id", user.id);
+    if (!user) return;
 
-      if (contactsError) throw contactsError;
-      if (!contactsData || contactsData.length === 0) {
-        setRecentChats([]);
+    try {
+      console.log("Fetching recent chats for user:", user.id);
+
+      // First try to find all conversations where there are messages
+      const { data: messagesData, error: messagesError } = await supabase
+        .from("messages")
+        .select("sender_id, receiver_id")
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order("created_at", { ascending: false });
+
+      if (messagesError) {
+        console.error("Error fetching message partners:", messagesError);
+        throw messagesError;
+      }
+
+      console.log("Message partners data:", messagesData);
+
+      // Extract unique conversation partners
+      const conversationPartnerIds = new Set();
+      messagesData.forEach((msg) => {
+        if (msg.sender_id === user.id) {
+          conversationPartnerIds.add(msg.receiver_id);
+        } else {
+          conversationPartnerIds.add(msg.sender_id);
+        }
+      });
+
+      console.log(
+        "Conversation partner IDs:",
+        Array.from(conversationPartnerIds)
+      );
+
+      if (conversationPartnerIds.size === 0) {
+        // Fallback to contacts if no messages found
+        const { data: contactsData, error: contactsError } = await supabase
+          .from("contacts")
+          .select("*")
+          .eq("user_id", user.id);
+
+        if (contactsError) throw contactsError;
+
+        console.log("Contacts data for chats (fallback):", contactsData);
+
+        if (!contactsData || contactsData.length === 0) {
+          console.log("No contacts found, setting empty recent chats");
+          setRecentChats([]);
+          return;
+        }
+
+        // Process contacts without messages
+        const emptyChats = contactsData.map((contact) => ({
+          contact,
+          last_message: "No messages yet",
+          last_message_time: contact.created_at,
+          unreadCount: 0,
+        }));
+
+        setRecentChats(emptyChats);
         return;
       }
 
-      // Then get the last message for each contact
+      // Now fetch contact details for all conversation partners
+      const { data: contactsData, error: contactsError } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("user_id", user.id)
+        .in("contact_user_id", Array.from(conversationPartnerIds));
+
+      if (contactsError) {
+        console.error(
+          "Error fetching contacts for conversation partners:",
+          contactsError
+        );
+        throw contactsError;
+      }
+
+      console.log("Contacts data for conversation partners:", contactsData);
+
+      // For any conversation partners that aren't in contacts, we need to fetch their profiles
+      const contactUserIds = new Set(
+        contactsData.map((c) => c.contact_user_id)
+      );
+      const missingPartnerIds = Array.from(conversationPartnerIds).filter(
+        (id) => !contactUserIds.has(id)
+      );
+
+      console.log("Missing partner IDs not in contacts:", missingPartnerIds);
+
+      // Fetch profiles for missing partners
+      let nonContactProfiles = [];
+      if (missingPartnerIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("user_id", missingPartnerIds);
+
+        if (profilesError) {
+          console.error(
+            "Error fetching profiles for missing partners:",
+            profilesError
+          );
+        } else {
+          console.log("Profiles for missing partners:", profilesData);
+
+          // Convert profiles to contact-like objects
+          nonContactProfiles = profilesData.map((profile) => ({
+            id: `temp-${profile.user_id}`, // Temporary ID for the UI
+            user_id: user.id,
+            contact_user_id: profile.user_id,
+            name: profile.name || "Unknown User",
+            username: profile.username,
+            profile_image_url: profile.profile_image_url,
+            is_temp: true, // Flag to indicate this is not a saved contact
+          }));
+        }
+      }
+
+      // Combine contacts and non-contact profiles
+      const allContacts = [...contactsData, ...nonContactProfiles];
+
+      // Then get the last message for each contact/profile
       const chatsWithMessages = await Promise.all(
-        contactsData.map(async (contact) => {
+        allContacts.map(async (contact) => {
           // Get the last message in this conversation
-          const { data: messages } = await supabase
+          const { data: messages, error: msgError } = await supabase
             .from("messages")
             .select("*")
             .or(
@@ -146,15 +305,33 @@ const Messages = () => {
             .order("created_at", { ascending: false })
             .limit(1);
 
+          if (msgError) {
+            console.error(
+              `Error fetching messages for contact ${contact.name}:`,
+              msgError
+            );
+          }
+
+          console.log(`Messages for contact ${contact.name}:`, messages);
+
           const lastMessage = messages?.[0]; // Get first message or undefined
 
           // Get unread count for this contact
-          const { count } = await supabase
+          const { count, error: countError } = await supabase
             .from("messages")
             .select("*", { count: "exact" })
             .eq("sender_id", contact.contact_user_id)
             .eq("receiver_id", user.id)
             .eq("is_read", false);
+
+          if (countError) {
+            console.error(
+              `Error getting unread count for contact ${contact.name}:`,
+              countError
+            );
+          }
+
+          console.log(`Unread count for ${contact.name}:`, count);
 
           return {
             contact,
@@ -170,13 +347,17 @@ const Messages = () => {
         (a, b) => new Date(b.last_message_time) - new Date(a.last_message_time)
       );
 
+      console.log("Setting recent chats:", chatsWithMessages);
       setRecentChats(chatsWithMessages);
     } catch (error) {
       console.error("Error fetching recent chats:", error);
       setRecentChats([]);
     }
   };
+
   const fetchContacts = async () => {
+    if (!user) return;
+
     try {
       setLoading(true);
       // Use the user ID from the auth context instead of a parameter
@@ -194,7 +375,6 @@ const Messages = () => {
       const { data, error } = await query.order("name");
 
       console.log("Contacts data:", data); // Debug log
-      console.log("Error:", error); // Debug log
 
       if (error) {
         console.error("Error fetching contacts:", error);
@@ -207,21 +387,49 @@ const Messages = () => {
       setLoading(false);
     }
   };
-  const handleChatSelect = (contactId) => {
-    navigate(`/chat/${contactId}`);
+
+  const handleChatSelect = (contact) => {
+    // Use contact_user_id instead of contact record id
+    navigate(`/chat/${contact.contact_user_id}`);
   };
+
   const handleContactSelect = (contactId) => {
     navigate(`/contacts/${contactId}`);
   };
 
   const renderChatList = () => (
     <div className="space-y-1">
+      {recentChats.length === 0 && !loading && (
+        <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+          <svg
+            className="w-16 h-16 mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
+          </svg>
+          <p>No chats found</p>
+          <button
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg"
+            onClick={() => setActiveView("contacts")}
+          >
+            Start a new chat
+          </button>
+        </div>
+      )}
+
       {recentChats.map((chat) => (
         <div
           key={chat.contact.id}
           className="flex items-center p-3 hover:bg-gray-800 rounded cursor-pointer"
-          // In renderChatList()
-          onClick={() => handleChatSelect(chat.contact.id)}
+          onClick={() => handleChatSelect(chat.contact)}
         >
           <div className="relative w-12 h-12 rounded-full overflow-hidden bg-gray-700 mr-3">
             {chat.contact.profile_image_url ? (
@@ -264,6 +472,17 @@ const Messages = () => {
               >
                 {chat.last_message}
               </p>
+              {chat.contact.is_temp && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddTempContact(chat.contact);
+                  }}
+                  className="text-xs bg-blue-600 hover:bg-blue-500 px-2 py-0.5 rounded ml-2"
+                >
+                  Add
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -276,7 +495,34 @@ const Messages = () => {
       )}
     </div>
   );
+  // Add this function to your Messages component
+  const handleAddTempContact = async (tempContact) => {
+    try {
+      // Insert the temporary contact into the contacts table
+      const { data, error } = await supabase.from("contacts").insert({
+        user_id: user.id,
+        contact_user_id: tempContact.contact_user_id,
+        name: tempContact.name,
+        username: tempContact.username,
+        email: tempContact.email,
+        phone: tempContact.phone,
+        profile_image_url: tempContact.profile_image_url,
+        is_favorite: false,
+        is_blocked: false,
+      });
 
+      if (error) throw error;
+
+      // Refresh chat list
+      await fetchRecentChats();
+
+      // Show success message (you can implement this)
+      console.log("Contact added successfully");
+    } catch (error) {
+      console.error("Error adding contact:", error);
+      // Show error message (you can implement this)
+    }
+  };
   const renderContactsList = () => (
     <div className="space-y-1">
       {contacts.map((contact) => (
@@ -297,9 +543,9 @@ const Messages = () => {
                 {contact.name ? contact.name.charAt(0).toUpperCase() : "?"}
               </div>
             )}
-            {contact.unreadCount > 0 && (
+            {unreadCounts.byContact[contact.contact_user_id] > 0 && (
               <div className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center border-2 border-gray-900">
-                {contact.unreadCount}
+                {unreadCounts.byContact[contact.contact_user_id]}
               </div>
             )}
           </div>
@@ -317,7 +563,7 @@ const Messages = () => {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleChatSelect(contact.id);
+                  handleChatSelect(contact);
                 }}
                 className="p-1 text-gray-500 hover:text-blue-400 transition-colors"
               >
@@ -371,6 +617,55 @@ const Messages = () => {
       )}
     </div>
   );
+
+  // Add filter controls for contacts
+  const renderFilters = () => {
+    if (activeView !== "contacts") return null;
+
+    return (
+      <div className="flex space-x-2 px-4 py-2">
+        <button
+          className={`px-3 py-1 rounded-full text-sm ${
+            activeFilter === "all"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-300"
+          }`}
+          onClick={() => {
+            setActiveFilter("all");
+            fetchContacts();
+          }}
+        >
+          All
+        </button>
+        <button
+          className={`px-3 py-1 rounded-full text-sm ${
+            activeFilter === "favorites"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-300"
+          }`}
+          onClick={() => {
+            setActiveFilter("favorites");
+            fetchContacts();
+          }}
+        >
+          Favorites
+        </button>
+        <button
+          className={`px-3 py-1 rounded-full text-sm ${
+            activeFilter === "blocked"
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-300"
+          }`}
+          onClick={() => {
+            setActiveFilter("blocked");
+            fetchContacts();
+          }}
+        >
+          Blocked
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-900">
@@ -440,6 +735,8 @@ const Messages = () => {
             Contacts
           </button>
         </div>
+
+        {renderFilters()}
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">

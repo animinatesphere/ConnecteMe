@@ -1,17 +1,3 @@
-// Add a new table called "contact_requests" with the following structure:
-/*
-CREATE TABLE contact_requests (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  sender_id UUID NOT NULL REFERENCES auth.users(id),
-  receiver_id UUID NOT NULL REFERENCES auth.users(id),
-  status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, accepted, rejected
-  message TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(sender_id, receiver_id)
-);
-*/
-
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -43,26 +29,26 @@ const Contacts = () => {
     }
   }, [user, navigate, location]);
 
-  // Fetch pending contact requests
+  // 1. Fetch pending contact requests with proper relationship
   const fetchPendingRequests = async (userId) => {
     try {
       const { data, error } = await supabase
         .from("contact_requests")
         .select(
           `
-          id, 
-          message, 
-          created_at,
-          sender_id, 
-          profiles:sender_id (
-            user_id,
-            name, 
-            username, 
-            email,
-            phone,
-            profile_image_url
-          )
-        `
+        id,
+        message,
+        created_at,
+        sender_id,
+        profiles!contact_requests_sender_id_fkey (
+          user_id,
+          name,
+          username,
+          email,
+          phone,
+          profile_image_url
+        )
+      `
         )
         .eq("receiver_id", userId)
         .eq("status", "pending")
@@ -72,6 +58,42 @@ const Contacts = () => {
       setPendingRequests(data || []);
     } catch (error) {
       console.error("Error fetching pending requests:", error);
+    }
+  };
+
+  // 2. Send a contact request
+  const sendContactRequest = async (senderId, receiverId, message) => {
+    try {
+      const { data, error } = await supabase.from("contact_requests").insert([
+        {
+          sender_id: senderId,
+          receiver_id: receiverId,
+          message: message,
+          status: "pending",
+        },
+      ]);
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error("Error sending contact request:", error);
+      return { success: false, error };
+    }
+  };
+
+  // 3. Update a contact request status
+  const updateContactRequestStatus = async (requestId, status) => {
+    try {
+      const { data, error } = await supabase
+        .from("contact_requests")
+        .update({ status: status, updated_at: new Date() })
+        .eq("id", requestId);
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      console.error(`Error updating contact request to ${status}:`, error);
+      return { success: false, error };
     }
   };
 
@@ -678,8 +700,6 @@ const ContactList = ({
   );
 };
 
-// AddContactModal Component
-// Continuing the AddContactModal Component
 const AddContactModal = ({ onClose, userId, onContactAdded }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -689,8 +709,291 @@ const AddContactModal = ({ onClose, userId, onContactAdded }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [requestStatus, setRequestStatus] = useState({});
 
-  // handleSearch, sendContactRequest, cancelContactRequest, acceptContactRequest, rejectContactRequest functions...
-  // All these functions are implemented in the pasted code already
+  // Search for users
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setMessage("Please enter a search term");
+      return;
+    }
+
+    try {
+      setSearching(true);
+      setMessage("");
+
+      // Search for users by name
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .ilike("name", `%${searchTerm}%`)
+        .neq("user_id", userId)
+        .limit(10);
+
+      if (profilesError) throw profilesError;
+
+      // Check if users are already contacts
+      const { data: contactsData } = await supabase
+        .from("contacts")
+        .select("contact_user_id")
+        .eq("user_id", userId);
+
+      const contactIds = contactsData?.map((c) => c.contact_user_id) || [];
+
+      // Check if there are any pending requests
+      const { data: requestsData } = await supabase
+        .from("contact_requests")
+        .select("*")
+        .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+
+      const results = profilesData.map((profile) => {
+        // Check if this profile is already a contact
+        const isContact = contactIds.includes(profile.user_id);
+
+        // Check if there's a pending request
+        let requestStatus = null;
+        if (requestsData) {
+          const outgoingRequest = requestsData.find(
+            (req) =>
+              req.sender_id === userId && req.receiver_id === profile.user_id
+          );
+
+          const incomingRequest = requestsData.find(
+            (req) =>
+              req.sender_id === profile.user_id && req.receiver_id === userId
+          );
+
+          if (outgoingRequest) {
+            requestStatus = {
+              id: outgoingRequest.id,
+              status: outgoingRequest.status,
+              direction: "outgoing",
+            };
+          } else if (incomingRequest) {
+            requestStatus = {
+              id: incomingRequest.id,
+              status: incomingRequest.status,
+              direction: "incoming",
+            };
+          }
+        }
+
+        return {
+          ...profile,
+          isContact,
+          requestStatus,
+        };
+      });
+
+      setSearchResults(results);
+
+      if (results.length === 0) {
+        setMessage("No users found matching your search");
+      }
+    } catch (error) {
+      console.error("Error searching for users:", error);
+      setMessage("An error occurred while searching");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // Send a contact request
+  const sendContactRequest = async (profile) => {
+    if (!profile || !profile.user_id) return;
+
+    try {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: "sending",
+      }));
+
+      const { error } = await supabase.from("contact_requests").insert({
+        sender_id: userId,
+        receiver_id: profile.user_id,
+        message: contactMessage.trim(),
+        status: "pending",
+      });
+
+      if (error) throw error;
+
+      // Update the search results to show request sent
+      setSearchResults((prev) =>
+        prev.map((p) => {
+          if (p.user_id === profile.user_id) {
+            return {
+              ...p,
+              requestStatus: {
+                status: "pending",
+                direction: "outgoing",
+              },
+            };
+          }
+          return p;
+        })
+      );
+
+      setSelectedUser(null);
+      setContactMessage("");
+      setMessage("Contact request sent successfully");
+    } catch (error) {
+      console.error("Error sending contact request:", error);
+      setMessage("Failed to send contact request");
+    } finally {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: null,
+      }));
+    }
+  };
+
+  // Cancel a pending contact request
+  const cancelContactRequest = async (profile) => {
+    if (!profile?.requestStatus?.id) return;
+
+    try {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: "cancelling",
+      }));
+
+      const { error } = await supabase
+        .from("contact_requests")
+        .delete()
+        .eq("id", profile.requestStatus.id);
+
+      if (error) throw error;
+
+      // Update the search results
+      setSearchResults((prev) =>
+        prev.map((p) => {
+          if (p.user_id === profile.user_id) {
+            return {
+              ...p,
+              requestStatus: null,
+            };
+          }
+          return p;
+        })
+      );
+
+      setMessage("Contact request cancelled");
+    } catch (error) {
+      console.error("Error cancelling contact request:", error);
+      setMessage("Failed to cancel request");
+    } finally {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: null,
+      }));
+    }
+  };
+
+  // Accept a contact request
+  const acceptContactRequest = async (profile) => {
+    if (!profile?.requestStatus?.id) return;
+
+    try {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: "accepting",
+      }));
+
+      // 1. Create a new contact entry
+      const { error: contactError } = await supabase.from("contacts").insert({
+        user_id: userId,
+        contact_user_id: profile.user_id,
+        name: profile.name,
+        username: profile.username,
+        email: profile.email,
+        phone: profile.phone,
+        profile_image_url: profile.profile_image_url,
+        is_favorite: false,
+        is_blocked: false,
+      });
+
+      if (contactError) throw contactError;
+
+      // 2. Update the request status
+      const { error: requestError } = await supabase
+        .from("contact_requests")
+        .update({ status: "accepted" })
+        .eq("id", profile.requestStatus.id);
+
+      if (requestError) throw requestError;
+
+      // Update UI
+      setSearchResults((prev) =>
+        prev.map((p) => {
+          if (p.user_id === profile.user_id) {
+            return {
+              ...p,
+              isContact: true,
+              requestStatus: {
+                ...p.requestStatus,
+                status: "accepted",
+              },
+            };
+          }
+          return p;
+        })
+      );
+
+      setMessage("Contact request accepted");
+      onContactAdded(); // Refresh contacts list
+    } catch (error) {
+      console.error("Error accepting contact request:", error);
+      setMessage("Failed to accept request");
+    } finally {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: null,
+      }));
+    }
+  };
+
+  // Reject a contact request
+  const rejectContactRequest = async (profile) => {
+    if (!profile?.requestStatus?.id) return;
+
+    try {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: "rejecting",
+      }));
+
+      const { error } = await supabase
+        .from("contact_requests")
+        .update({ status: "rejected" })
+        .eq("id", profile.requestStatus.id);
+
+      if (error) throw error;
+
+      // Update UI
+      setSearchResults((prev) =>
+        prev.map((p) => {
+          if (p.user_id === profile.user_id) {
+            return {
+              ...p,
+              requestStatus: {
+                ...p.requestStatus,
+                status: "rejected",
+              },
+            };
+          }
+          return p;
+        })
+      );
+
+      setMessage("Contact request rejected");
+    } catch (error) {
+      console.error("Error rejecting contact request:", error);
+      setMessage("Failed to reject request");
+    } finally {
+      setRequestStatus((prev) => ({
+        ...prev,
+        [profile.user_id]: null,
+      }));
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
@@ -791,6 +1094,16 @@ const AddContactModal = ({ onClose, userId, onContactAdded }) => {
                               Reject
                             </button>
                           </div>
+                        )}
+                      {profile.requestStatus.direction === "outgoing" &&
+                        profile.requestStatus.status === "pending" && (
+                          <button
+                            onClick={() => cancelContactRequest(profile)}
+                            disabled={requestStatus[profile.user_id]}
+                            className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded mt-1"
+                          >
+                            Cancel
+                          </button>
                         )}
                     </div>
                   ) : (
