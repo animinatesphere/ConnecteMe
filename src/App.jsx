@@ -60,7 +60,7 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Navbar />
+        {/* <Navbar /> */}
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
